@@ -76,14 +76,12 @@ static CGFloat _underlineHeightNormalLegacyDefault =
 
   CGFloat scale = [UIScreen mainScreen].scale;
   CGRect bounds = CGRectMake(0, 0, clearButtonSize.width * scale, clearButtonSize.height * scale);
-  UIGraphicsImageRendererFormat *format = [[UIGraphicsImageRendererFormat alloc] init];
-  format.scale = scale;
-  UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:bounds.size format:format];
-  UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull rendererContext) {
-    [color setFill];
+  UIGraphicsBeginImageContextWithOptions(bounds.size, false, scale);
+  [color setFill];
 
-    [MDCPathForClearButtonLegacyImageFrame(bounds) fill];
-  }];
+  [MDCPathForClearButtonLegacyImageFrame(bounds) fill];
+  UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
+  UIGraphicsEndImageContext();
 
   image = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
   return image;
