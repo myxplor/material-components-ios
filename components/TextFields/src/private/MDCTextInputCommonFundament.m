@@ -627,12 +627,12 @@ static inline UIColor *MDCTextInputUnderlineColor() {
                                       MDCTextInputClearButtonImageSquareWidthHeight);
 
   CGRect bounds = CGRectMake(0, 0, clearButtonSize.width, clearButtonSize.height);
-  UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0);
-  [UIColor.grayColor setFill];
-
-  [MDCPathForClearButtonImageFrame(bounds) fill];
-  UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
-  UIGraphicsEndImageContext();
+  UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithSize:bounds.size];
+  UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext * _Nonnull rendererContext) {
+      [UIColor.grayColor setFill];
+      
+      [MDCPathForClearButtonImageFrame(bounds) fill];
+  }];
 
   image = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
   return image;
