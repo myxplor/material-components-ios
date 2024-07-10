@@ -18,15 +18,14 @@
 
 #import "../MDCSnackbarError.h"
 #import "../MDCSnackbarMessage.h"
-#import "MaterialAnimationTiming.h"
-#import "MaterialAvailability.h"
+#import "MDCAvailability.h"
 #import "MDCSnackbarAlignment.h"
 #import "MDCSnackbarMessageView.h"
 #import "MDCSnackbarMessageInternal.h"
 #import "MDCSnackbarMessageViewInternal.h"
-#import "MaterialApplication.h"
-#import "MaterialKeyboardWatcher.h"
-#import "MaterialOverlay.h"
+#import "UIApplication+MDCAppExtensions.h"
+#import "MDCKeyboardWatcher.h"
+#import "MDCOverlayImplementor.h"
 
 NSString *const MDCSnackbarOverlayIdentifier = @"MDCSnackbar";
 
@@ -589,7 +588,7 @@ static const CGFloat kMaximumHeightLegacy = 80;
     duration = onscreen ? MDCSnackbarEnterTransitionDuration : MDCSnackbarExitTransitionDuration;
   }
   CAMediaTimingFunction *timingFunction =
-      [CAMediaTimingFunction mdc_functionWithType:MDCAnimationTimingFunctionEaseInOut];
+      [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
   [CATransaction begin];
   [CATransaction setAnimationTimingFunction:timingFunction];
   [CATransaction setCompletionBlock:completion];
@@ -914,26 +913,6 @@ static const CGFloat kMaximumHeightLegacy = 80;
   } else {
     return NO;
   }
-}
-
-#pragma mark - Timing functions
-
-static void WrapWithTimingFunctionForCurve(MDCAnimationTimingFunction mediaTiming,
-                                           void (^block)(void)) {
-  [CATransaction begin];
-  [CATransaction
-      setAnimationTimingFunction:[CAMediaTimingFunction mdc_functionWithType:mediaTiming]];
-  block();
-  [CATransaction commit];
-}
-
-+ (void)animateWithDuration:(NSTimeInterval)duration
-                      curve:(MDCAnimationTimingFunction)curve
-                 animations:(void (^)(void))animations
-                 completion:(void (^)(BOOL finished))completion {
-  WrapWithTimingFunctionForCurve(curve, ^{
-    [UIView animateWithDuration:duration animations:animations completion:completion];
-  });
 }
 
 @end

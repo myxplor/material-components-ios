@@ -34,6 +34,8 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+const int MAX_LAYOUT_PASSES = 10;
+
 // The Bundle for string resources.
 static NSString *const kMaterialDialogsBundle = @"MaterialDialogs.bundle";
 
@@ -105,6 +107,13 @@ static NSString *const kMaterialDialogsBundle = @"MaterialDialogs.bundle";
 @property(nonatomic, nonnull, strong) MDCAlertActionManager *actionManager;
 @property(nonatomic, nullable, strong) UIView *titleIconView;
 
+/**
+ This counter caps the maximum number of layout passes that can be done in a single layout cycle.
+
+ This variable is added as a direct fix for b/345505157.
+ */
+@property(nonatomic) int layoutPassCounter;
+
 - (nonnull instancetype)initWithTitle:(nullable NSString *)title
                               message:(nullable NSString *)message;
 
@@ -173,6 +182,7 @@ static NSString *const kMaterialDialogsBundle = @"MaterialDialogs.bundle";
   if (self) {
     _transitionController = [[MDCDialogTransitionController alloc] init];
 
+    _layoutPassCounter = 0;
     _alertTitle = [title copy];
     _titleAlignment = NSTextAlignmentNatural;
     _messageAlignment = NSTextAlignmentNatural;
@@ -218,6 +228,7 @@ static NSString *const kMaterialDialogsBundle = @"MaterialDialogs.bundle";
           isEqualToString:previousTraitCollection.preferredContentSizeCategory]) {
     self.preferredContentSize =
         [self.alertView calculatePreferredContentSizeForBounds:CGRectInfinite.size];
+    [self.view setNeedsLayout];
   }
 }
 
@@ -681,8 +692,6 @@ static NSString *const kMaterialDialogsBundle = @"MaterialDialogs.bundle";
   [self setupAlertView];
 
   _previousLayoutSize = CGSizeZero;
-  CGSize idealSize = [self.alertView calculatePreferredContentSizeForBounds:CGRectInfinite.size];
-  self.preferredContentSize = idealSize;
 
   self.preferredContentSize =
       [self.alertView calculatePreferredContentSizeForBounds:CGRectInfinite.size];
@@ -727,6 +736,12 @@ static NSString *const kMaterialDialogsBundle = @"MaterialDialogs.bundle";
 }
 
 - (void)viewDidLayoutSubviews {
+  // Increments the counter to account for an additional layout pass.
+  self.layoutPassCounter += 1;
+  // Abort if the layout pass counter is too high.
+  if (self.layoutPassCounter > MAX_LAYOUT_PASSES) {
+    return;
+  }
   // Recalculate preferredContentSize and potentially the view frame.
   BOOL boundsSizeChanged =
       !CGSizeEqualToSize(CGRectStandardize(self.view.bounds).size, _previousLayoutSize);
@@ -753,6 +768,8 @@ static NSString *const kMaterialDialogsBundle = @"MaterialDialogs.bundle";
 
 - (void)viewWillLayoutSubviews {
   [super viewWillLayoutSubviews];
+  // Resets counter as this function is called at the beginning of a new layout cycle.
+  self.layoutPassCounter = 0;
 
   // Recalculate preferredSize, which is based on width available, if the viewSize has changed.
   if (CGRectGetWidth(self.view.bounds) != _previousLayoutSize.width ||
@@ -779,7 +796,7 @@ static NSString *const kMaterialDialogsBundle = @"MaterialDialogs.bundle";
       animateAlongsideTransition:^(
           __unused id<UIViewControllerTransitionCoordinatorContext> _Nonnull context) {
         [self.alertView setNeedsLayout];
-        // Reset preferredContentSize on viewWIllTransition to take advantage of additional width
+        // Reset preferredContentSize on viewWillTransition to take advantage of additional width.
         self.preferredContentSize =
             [self.alertView calculatePreferredContentSizeForBounds:CGRectInfinite.size];
       }

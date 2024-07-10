@@ -27,6 +27,8 @@
 #import "private/MDCSnackbarMessageViewInternal.h"
 #import "private/MDCSnackbarOverlayView.h"
 
+NS_ASSUME_NONNULL_BEGIN
+
 /** Test whether any of the accessibility elements of a view is focused */
 static BOOL UIViewHasFocusedAccessibilityElement(UIView *view) {
   for (NSInteger i = 0; i < [view accessibilityElementCount]; i++) {
@@ -89,7 +91,7 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
 /**
  The currently-showing Snackbar.
  */
-@property(nonatomic) MDCSnackbarMessageView *currentSnackbar;
+@property(nonatomic, nullable) MDCSnackbarMessageView *currentSnackbar;
 
 /**
  Whether or not we are currently showing a message.
@@ -262,7 +264,7 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   // only if the user isn't running VoiceOver.
   [self.overlayView
       showSnackbarView:snackbarView
-              animated:YES
+              animated:self.manager.isMessageAnimationEnabled
             completion:^{
               if ([self snackbarAllowsFocus:snackbarView]) {
                 UIAccessibilityPostNotification(self.manager.focusAccessibilityNotification,
@@ -334,7 +336,7 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   }
 
   [self.overlayView
-      dismissSnackbarViewAnimated:YES
+      dismissSnackbarViewAnimated:self.manager.isMessageAnimationEnabled
                        completion:^{
                          self.overlayView.hidden = YES;
                          [self deactivateOverlay:self.overlayView];
@@ -383,11 +385,15 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
 }
 
 - (BOOL)isSnackbarTransient:(MDCSnackbarMessageView *)snackbarView {
-  if ([self isVoiceOverRunning]) {
+  if (snackbarView.message.usesLegacyDismissalBehavior) {
+    if ([self isVoiceOverRunning]) {
+      return ![snackbarView shouldWaitForDismissalDuringVoiceover];
+    } else {
+      return YES;
+    }
+  } else {
     return ![snackbarView shouldWaitForDismissalDuringVoiceover];
   }
-
-  return YES;
 }
 
 #pragma mark - Overlay Activation
@@ -606,7 +612,6 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   UIFont *_messageFont;
   UIFont *_buttonFont;
   BOOL _uppercaseButtonTitle;
-  CGFloat _disabledButtonAlpha;
   UIColor *_buttonInkColor;
   NSMutableDictionary<NSNumber *, UIColor *> *_buttonTitleColors;
   BOOL _shouldApplyStyleChangesToVisibleSnackbars;
@@ -629,11 +634,11 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
     _internalManager = [[MDCSnackbarManagerInternal alloc] initWithSnackbarManager:self
                                                                        windowScene:windowScene];
     _uppercaseButtonTitle = YES;
-    _disabledButtonAlpha = (CGFloat)0.12;
     _messageElevation = MDCShadowElevationSnackbar;
     _mdc_overrideBaseElevation = -1;
     _focusAccessibilityNotification = UIAccessibilityLayoutChangedNotification;
     _shouldShowMessageWhenVoiceOverIsRunning = YES;
+    _messageAnimationEnabled = YES;
     _enableDismissalAccessibilityAffordance = NO;
     _usesGM3Shapes = NO;
   }
@@ -644,15 +649,15 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   return [self initWithWindowScene:nil];
 }
 
-- (void)setDelegate:(id<MDCSnackbarManagerDelegate>)delegate {
+- (void)setDelegate:(nullable id<MDCSnackbarManagerDelegate>)delegate {
   self.internalManager.delegate = delegate;
 }
 
-- (id<MDCSnackbarManagerDelegate>)delegate {
+- (nullable id<MDCSnackbarManagerDelegate>)delegate {
   return self.internalManager.delegate;
 }
 
-- (void)showMessage:(MDCSnackbarMessage *)inputMessage {
+- (void)showMessage:(nullable MDCSnackbarMessage *)inputMessage {
   if (!inputMessage) {
     return;
   }
@@ -670,7 +675,7 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   });
 }
 
-- (void)setPresentationHostView:(UIView *)hostView {
+- (void)setPresentationHostView:(nullable UIView *)hostView {
   NSAssert([NSThread isMainThread], @"setPresentationHostView must be called on main thread.");
 
   self.internalManager.presentationHostView = hostView;
@@ -682,7 +687,7 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   return (self.internalManager.showingMessage || self.internalManager.pendingMessages.count != 0);
 }
 
-- (void)dismissAndCallCompletionBlocksWithCategory:(NSString *)category {
+- (void)dismissAndCallCompletionBlocksWithCategory:(nullable NSString *)category {
   // Snag a copy now, we'll use that internally.
   NSString *categoryToDismiss = [category copy];
 
@@ -750,7 +755,8 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
 
 #pragma mark - Suspension
 
-- (id<MDCSnackbarSuspensionToken>)suspendMessagesWithCategory:(NSString *)category {
+- (nullable id<MDCSnackbarSuspensionToken>)suspendMessagesWithCategory:
+    (nullable NSString *)category {
   MDCSnackbarManagerSuspensionToken *token =
       [[MDCSnackbarManagerSuspensionToken alloc] initWithManager:self];
   token.category = category;
@@ -764,7 +770,7 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   return token;
 }
 
-- (id<MDCSnackbarSuspensionToken>)suspendAllMessages {
+- (nullable id<MDCSnackbarSuspensionToken>)suspendAllMessages {
   return [self suspendMessagesWithCategory:kAllMessagesCategory];
 }
 
@@ -775,7 +781,7 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   });
 }
 
-- (void)resumeMessagesWithToken:(id<MDCSnackbarSuspensionToken>)inToken {
+- (void)resumeMessagesWithToken:(nullable id<MDCSnackbarSuspensionToken>)inToken {
   if (![inToken isKindOfClass:[MDCSnackbarManagerSuspensionToken class]]) {
     return;
   }
@@ -796,7 +802,8 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   }
 }
 
-- (void)setSnackbarMessageViewBackgroundColor:(UIColor *)snackbarMessageViewBackgroundColor {
+- (void)setSnackbarMessageViewBackgroundColor:
+    (nullable UIColor *)snackbarMessageViewBackgroundColor {
   if (snackbarMessageViewBackgroundColor != _snackbarMessageViewBackgroundColor) {
     _snackbarMessageViewBackgroundColor = snackbarMessageViewBackgroundColor;
     [self runSnackbarUpdatesOnMainThread:^{
@@ -806,11 +813,11 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   }
 }
 
-- (UIColor *)snackbarMessageViewBackgroundColor {
+- (nullable UIColor *)snackbarMessageViewBackgroundColor {
   return _snackbarMessageViewBackgroundColor;
 }
 
-- (void)setSnackbarMessageViewShadowColor:(UIColor *)snackbarMessageViewShadowColor {
+- (void)setSnackbarMessageViewShadowColor:(nullable UIColor *)snackbarMessageViewShadowColor {
   if (snackbarMessageViewShadowColor != _snackbarMessageViewShadowColor) {
     _snackbarMessageViewShadowColor = snackbarMessageViewShadowColor;
     [self runSnackbarUpdatesOnMainThread:^{
@@ -820,11 +827,11 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   }
 }
 
-- (UIColor *)snackbarMessageViewShadowColor {
+- (nullable UIColor *)snackbarMessageViewShadowColor {
   return _snackbarMessageViewShadowColor;
 }
 
-- (void)setMessageTextColor:(UIColor *)messageTextColor {
+- (void)setMessageTextColor:(nullable UIColor *)messageTextColor {
   if (messageTextColor != _messageTextColor) {
     _messageTextColor = messageTextColor;
     [self runSnackbarUpdatesOnMainThread:^{
@@ -846,11 +853,11 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   }
 }
 
-- (UIColor *)messageTextColor {
+- (nullable UIColor *)messageTextColor {
   return _messageTextColor;
 }
 
-- (void)setMessageFont:(UIFont *)messageFont {
+- (void)setMessageFont:(nullable UIFont *)messageFont {
   if (messageFont != _messageFont) {
     _messageFont = messageFont;
     [self runSnackbarUpdatesOnMainThread:^{
@@ -859,11 +866,11 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   }
 }
 
-- (UIFont *)messageFont {
+- (nullable UIFont *)messageFont {
   return _messageFont;
 }
 
-- (void)setButtonFont:(UIFont *)buttonFont {
+- (void)setButtonFont:(nullable UIFont *)buttonFont {
   if (buttonFont != _buttonFont) {
     _buttonFont = buttonFont;
     [self runSnackbarUpdatesOnMainThread:^{
@@ -872,7 +879,7 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   }
 }
 
-- (UIFont *)buttonFont {
+- (nullable UIFont *)buttonFont {
   return _buttonFont;
 }
 
@@ -891,23 +898,7 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   return _uppercaseButtonTitle;
 }
 
-- (void)setDisabledButtonAlpha:(CGFloat)disabledButtonAlpha {
-  _disabledButtonAlpha = disabledButtonAlpha;
-
-  [self runSnackbarUpdatesOnMainThread:^{
-    UIButton *currentButton = self.internalManager.currentSnackbar.actionButton;
-    if ([currentButton isKindOfClass:[MDCButton class]]) {
-      MDCButton *button = (MDCButton *)currentButton;
-      button.disabledAlpha = disabledButtonAlpha;
-    }
-  }];
-}
-
-- (CGFloat)disabledButtonAlpha {
-  return _disabledButtonAlpha;
-}
-
-- (void)setButtonInkColor:(UIColor *)buttonInkColor {
+- (void)setButtonInkColor:(nullable UIColor *)buttonInkColor {
   _buttonInkColor = buttonInkColor;
 
   [self runSnackbarUpdatesOnMainThread:^{
@@ -919,11 +910,11 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   }];
 }
 
-- (UIColor *)buttonInkColor {
+- (nullable UIColor *)buttonInkColor {
   return _buttonInkColor;
 }
 
-- (void)setButtonTitleColor:(UIColor *)titleColor forState:(UIControlState)state {
+- (void)setButtonTitleColor:(nullable UIColor *)titleColor forState:(UIControlState)state {
   if (_buttonTitleColors == nil) {
     _buttonTitleColors = [NSMutableDictionary dictionary];
   }
@@ -935,7 +926,7 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
   }
 }
 
-- (UIColor *)buttonTitleColorForState:(UIControlState)state {
+- (nullable UIColor *)buttonTitleColorForState:(UIControlState)state {
   return _buttonTitleColors[@(state)];
 }
 
@@ -958,15 +949,15 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
 }
 
 - (void)setTraitCollectionDidChangeBlockForMessageView:
-    (void (^)(MDCSnackbarMessageView *,
-              UITraitCollection *))traitCollectionDidChangeBlockForMessageView {
+    (nullable void (^)(MDCSnackbarMessageView *,
+                       UITraitCollection *_Nullable))traitCollectionDidChangeBlockForMessageView {
   _traitCollectionDidChangeBlockForMessageView = traitCollectionDidChangeBlockForMessageView;
   self.internalManager.currentSnackbar.traitCollectionDidChangeBlock =
       traitCollectionDidChangeBlockForMessageView;
 }
 
 - (void)setMdc_elevationDidChangeBlockForMessageView:
-    (void (^)(id<MDCElevatable> _Nonnull, CGFloat))mdc_elevationDidChangeBlockForMessageView {
+    (nullable void (^)(id<MDCElevatable>, CGFloat))mdc_elevationDidChangeBlockForMessageView {
   _mdc_elevationDidChangeBlockForMessageView = mdc_elevationDidChangeBlockForMessageView;
   self.internalManager.currentSnackbar.mdc_elevationDidChangeBlock =
       mdc_elevationDidChangeBlockForMessageView;
@@ -994,3 +985,5 @@ static NSString *const kAllMessagesCategory = @"$$___ALL_MESSAGES___$$";
 }
 
 @end
+
+NS_ASSUME_NONNULL_END

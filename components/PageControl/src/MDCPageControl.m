@@ -14,6 +14,8 @@
 
 #import "MDCPageControl.h"
 
+#import <CoreGraphics/CoreGraphics.h>
+
 #import "private/MDCPageControlIndicator.h"
 #import "private/MDCPageControlTrackLayer.h"
 #import "private/MaterialPageControlStrings.h"
@@ -252,7 +254,7 @@ static inline CGFloat normalizeValue(CGFloat value, CGFloat minRange, CGFloat ma
       lround(scrollView.contentOffset.x / scrollView.frame.size.width);
   NSInteger scrolledPageNumberLTR = MAX(0, MIN(_numberOfPages - 1, unboundedPageNumberLTR));
   if ([self isRTL]) {
-    return self.numberOfPages - 1 - scrolledPageNumberLTR;
+    return MAX(0, self.numberOfPages - 1 - scrolledPageNumberLTR);
   }
   return scrolledPageNumberLTR;
 }

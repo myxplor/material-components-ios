@@ -14,6 +14,9 @@
 
 #import "MDCProgressGradientView.h"
 
+#import <CoreGraphics/CoreGraphics.h>
+#import <QuartzCore/QuartzCore.h>
+
 @interface MDCProgressGradientView ()
 
 @property(nonatomic, readonly) CAGradientLayer *gradientLayer;
@@ -65,7 +68,7 @@
   self.shapeLayer.strokeColor = UIColor.blackColor.CGColor;
   self.shapeLayer.lineWidth = CGRectGetHeight(self.gradientLayer.bounds);
   if (self.gradientLayer.cornerRadius > 0) {
-    self.shapeLayer.lineCap = kCALineCapRound;
+    self.shapeLayer.lineCap = kCALineCapButt;
   }
   self.shapeLayer.path = path.CGPath;
 }

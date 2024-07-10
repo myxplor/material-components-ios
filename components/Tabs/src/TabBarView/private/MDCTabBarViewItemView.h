@@ -21,6 +21,8 @@
 #import "MDCBadgeView.h"
 #import <MaterialComponents/MaterialRipple.h>
 
+NS_ASSUME_NONNULL_BEGIN
+
 /** A basic view that displays a title and image for a tab bar item within MDCTabBarView. */
 @interface MDCTabBarViewItemView : UIView <MDCTabBarViewCustomViewable>
 
@@ -34,6 +36,15 @@
 
 /** The image view to display the icon. */
 @property(nonatomic, strong, nonnull) UIImageView *iconImageView;
+
+/**
+ The size of the icon.
+
+ This property is not respected unless a value other than @c CGSizeZero is used.
+
+ @note Defaults to CGSizeZero.
+ */
+@property(nonatomic, assign) CGSize iconSize;
 
 /** The label to display the title. */
 @property(nonatomic, strong, nonnull) UILabel *titleLabel;
@@ -93,3 +104,5 @@
         "Enable disableRippleBehavior instead.");
 
 @end
+
+NS_ASSUME_NONNULL_END

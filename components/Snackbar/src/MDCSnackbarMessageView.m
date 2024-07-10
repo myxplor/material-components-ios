@@ -14,7 +14,6 @@
 
 #import <QuartzCore/QuartzCore.h>
 
-#import "CAMediaTimingFunction+MDCAnimationTiming.h"
 #import "MDCAvailability.h"
 #import "MDCButton.h"
 #import "MDCFlatButton.h"
@@ -33,6 +32,20 @@
 #import "MDCTypography.h"
 #import "UIFont+MaterialTypography.h"
 #import "MDCMath.h"
+
+NS_ASSUME_NONNULL_BEGIN
+
+@interface AccessibilityAffordanceButton : UIButton
+@end
+
+@implementation AccessibilityAffordanceButton
+
+- (BOOL)accessibilityActivate {
+  [self sendActionsForControlEvents:UIControlEventTouchUpInside];
+  return YES;
+}
+
+@end
 
 NSString *const MDCSnackbarMessageTitleAutomationIdentifier =
     @"MDCSnackbarMessageTitleAutomationIdentifier";
@@ -149,17 +162,17 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
   return self;
 }
 
-- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event {
   [_highlightDelegate scrollViewTouchBegan:self];
   [super touchesBegan:touches withEvent:event];
 }
 
-- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event {
   [_highlightDelegate scrollViewTouchEnded:self];
   [super touchesEnded:touches withEvent:event];
 }
 
-- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+- (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(nullable UIEvent *)event {
   [_highlightDelegate scrollViewTouchCancelled:self];
   [super touchesCancelled:touches withEvent:event];
 }
@@ -181,7 +194,7 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
 /**
  The constraints managing this view.
  */
-@property(nonatomic, strong) NSArray *viewConstraints;
+@property(nonatomic, strong, nullable) NSArray *viewConstraints;
 
 /**
  The view containing all of the visual content. Inset by @c kBorderWidth from the view.
@@ -217,7 +230,7 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
 /**
  Holds onto the dismissal handler, called when the Snackbar should dismiss due to user interaction.
  */
-@property(nonatomic, copy) MDCSnackbarMessageDismissHandler dismissalHandler;
+@property(nonatomic, copy, nullable) MDCSnackbarMessageDismissHandler dismissalHandler;
 
 @end
 
@@ -277,8 +290,8 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
                snackbarManager:MDCSnackbarManager.defaultManager];
 }
 
-- (instancetype)initWithMessage:(MDCSnackbarMessage *)message
-                 dismissHandler:(MDCSnackbarMessageDismissHandler)handler
+- (instancetype)initWithMessage:(nullable MDCSnackbarMessage *)message
+                 dismissHandler:(nullable MDCSnackbarMessageDismissHandler)handler
                 snackbarManager:(MDCSnackbarManager *)manager {
   self = [super initWithFrame:CGRectZero];
 
@@ -372,7 +385,7 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
     NSString *dismissalAccessibilityHint = NSLocalizedStringFromTableInBundle(
         dismissalAccessibilityHintKey, kMaterialSnackbarStringsTableName, [[self class] bundle],
         @"Dismissal accessibility hint for Snackbar");
-    _dismissalAccessibilityAffordance = [[UIButton alloc] init];
+    _dismissalAccessibilityAffordance = [[AccessibilityAffordanceButton alloc] init];
     _dismissalAccessibilityAffordance.isAccessibilityElement = YES;
     _dismissalAccessibilityAffordance.accessibilityLabel = dismissalAccessibilityLabel;
     _dismissalAccessibilityAffordance.accessibilityHint = dismissalAccessibilityHint;
@@ -517,7 +530,6 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
 
     actionButton.enableRippleBehavior = message.enableRippleBehavior;
     actionButton.uppercaseTitle = manager.uppercaseButtonTitle;
-    actionButton.disabledAlpha = manager.disabledButtonAlpha;
     if (manager.buttonInkColor) {
       actionButton.inkColor = manager.buttonInkColor;
     }
@@ -545,7 +557,8 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
   [self updateButtonFont];
 }
 
-- (void)dismissWithAction:(MDCSnackbarMessageAction *)action userInitiated:(BOOL)userInitiated {
+- (void)dismissWithAction:(nullable MDCSnackbarMessageAction *)action
+            userInitiated:(BOOL)userInitiated {
   if (self.dismissalHandler) {
     self.dismissalHandler(userInitiated, action);
 
@@ -601,7 +614,7 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
   }
 }
 
-- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+- (void)traitCollectionDidChange:(nullable UITraitCollection *)previousTraitCollection {
   [super traitCollectionDidChange:previousTraitCollection];
 
   if (self.traitCollectionDidChangeBlock) {
@@ -638,7 +651,8 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
 
 #pragma mark - Styling the view
 
-- (void)setSnackbarMessageViewBackgroundColor:(UIColor *)snackbarMessageViewBackgroundColor {
+- (void)setSnackbarMessageViewBackgroundColor:
+    (nullable UIColor *)snackbarMessageViewBackgroundColor {
   _snackbarMessageViewBackgroundColor = snackbarMessageViewBackgroundColor;
   self.backgroundColor = snackbarMessageViewBackgroundColor;
 }
@@ -648,7 +662,7 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
   self.layer.shadowColor = snackbarMessageViewShadowColor.CGColor;
 }
 
-- (void)setMessageTextColor:(UIColor *)messageTextColor {
+- (void)setMessageTextColor:(nullable UIColor *)messageTextColor {
   _messageTextColor = messageTextColor;
   if (_messageTextColor) {
     self.label.textColor = _messageTextColor;
@@ -692,11 +706,11 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
   _label.attributedText = messageString;
 }
 
-- (UIFont *)messageFont {
+- (nullable UIFont *)messageFont {
   return _messageFont;
 }
 
-- (void)setMessageFont:(UIFont *)font {
+- (void)setMessageFont:(nullable UIFont *)font {
   _messageFont = font;
 
   [self updateMessageFont];
@@ -720,11 +734,11 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
   [self setNeedsLayout];
 }
 
-- (UIFont *)buttonFont {
+- (nullable UIFont *)buttonFont {
   return _buttonFont;
 }
 
-- (void)setButtonFont:(UIFont *)font {
+- (void)setButtonFont:(nullable UIFont *)font {
   _buttonFont = font;
 
   [self updateButtonFont];
@@ -1152,7 +1166,7 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
   translationAnimation.toValue = [NSNumber numberWithDouble:-self.frame.size.width];
   translationAnimation.duration = MDCSnackbarLegacyTransitionDuration;
   translationAnimation.timingFunction =
-      [CAMediaTimingFunction mdc_functionWithType:MDCAnimationTimingFunctionTranslateOffScreen];
+      [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseIn];
   translationAnimation.delegate = self;
   translationAnimation.fillMode = kCAFillModeForwards;
   translationAnimation.removedOnCompletion = NO;
@@ -1165,7 +1179,7 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
   translationAnimation.toValue = [NSNumber numberWithDouble:self.frame.size.width];
   translationAnimation.duration = MDCSnackbarLegacyTransitionDuration;
   translationAnimation.timingFunction =
-      [CAMediaTimingFunction mdc_functionWithType:MDCAnimationTimingFunctionTranslateOffScreen];
+      [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseIn];
   translationAnimation.delegate = self;
   translationAnimation.fillMode = kCAFillModeForwards;
   translationAnimation.removedOnCompletion = NO;
@@ -1221,7 +1235,7 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
   [self handleButtonTapped:nil];
 }
 
-- (void)handleButtonTapped:(__unused UIButton *)sender {
+- (void)handleButtonTapped:(nullable __unused UIButton *)sender {
   [self dismissWithAction:self.message.action userInitiated:YES];
 }
 
@@ -1258,7 +1272,7 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
          (self.dismissalAccessibilityAffordance.accessibilityElementsHidden ? 0 : 1);
 }
 
-- (id)accessibilityElementAtIndex:(NSInteger)index {
+- (nullable id)accessibilityElementAtIndex:(NSInteger)index {
   if (index == 0) {
     return _label;
   } else if (index == 1 && self.actionButton) {
@@ -1288,7 +1302,7 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
 - (void)animateContentOpacityFrom:(CGFloat)fromOpacity
                                to:(CGFloat)toOpacity
                          duration:(NSTimeInterval)duration
-                   timingFunction:(CAMediaTimingFunction *)timingFunction {
+                   timingFunction:(nullable CAMediaTimingFunction *)timingFunction {
   [CATransaction begin];
   CABasicAnimation *opacityAnimation = [CABasicAnimation animationWithKeyPath:@"opacity"];
   opacityAnimation.duration = duration;
@@ -1304,14 +1318,16 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
   [CATransaction commit];
 }
 
-- (CABasicAnimation *)animateSnackbarOpacityFrom:(CGFloat)fromOpacity to:(CGFloat)toOpacity {
+- (nullable CABasicAnimation *)animateSnackbarOpacityFrom:(CGFloat)fromOpacity
+                                                       to:(CGFloat)toOpacity {
   CABasicAnimation *opacityAnimation = [CABasicAnimation animationWithKeyPath:@"opacity"];
   opacityAnimation.fromValue = @(fromOpacity);
   opacityAnimation.toValue = @(toOpacity);
   return opacityAnimation;
 }
 
-- (CABasicAnimation *)animateSnackbarScaleFrom:(CGFloat)fromScale toScale:(CGFloat)toScale {
+- (nullable CABasicAnimation *)animateSnackbarScaleFrom:(CGFloat)fromScale
+                                                toScale:(CGFloat)toScale {
   CABasicAnimation *scaleAnimation = [CABasicAnimation animationWithKeyPath:@"transform.scale"];
   scaleAnimation.fromValue = [NSNumber numberWithDouble:fromScale];
   scaleAnimation.toValue = [NSNumber numberWithDouble:toScale];
@@ -1358,7 +1374,7 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
   return self.elevation;
 }
 
-- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent *)event {
+- (BOOL)pointInside:(CGPoint)point withEvent:(nullable UIEvent *)event {
   // This check determines if pointInside has been called with an "empty" touch parameter.
   // An empty touch is a UIEvent of type UIEventTypeTouch, with a nil `allTouches` property.
   // The check's purpose is prevention of instant snackbar dismissal when VoiceControl is enabled.
@@ -1388,3 +1404,5 @@ static const CGFloat kMinimumAccessibiltyFontSize = 21;
 }
 
 @end
+
+NS_ASSUME_NONNULL_END

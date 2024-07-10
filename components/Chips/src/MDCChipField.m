@@ -13,21 +13,27 @@
 // limitations under the License.
 
 #import "MDCChipField.h"
-
-#import "MDCChipView.h"
-#import <MDFInternationalization/MDFInternationalization.h>
+#import <UIKit/UIKit.h>
 
 #import "MDCChipFieldDelegate.h"
+#import "MDCChipView.h"
 #import "MDCChipViewDeleteButton.h"
-#import "MDCTextField.h"
-#import "MaterialTextFields.h"
+#import <MDFInternationalization/MDFRTL.h>
 
 NSString *const MDCEmptyTextString = @"";
 NSString *const MDCChipDelimiterSpace = @" ";
+NSString *const MDCChipFieldDidSetTextNotification = @"MDCChipFieldDidSetTextNotification";
 
+/** Key for name of ChipField custom accessibility action that deletes a Chip. */
+static NSString *const kAccessibilityActionDeleteNameKey = @"ChipFieldAccessibilityActionDelete";
+/** The name of the accessibility table for localizations. */
+static NSString *const kLocalizationAccessibilityTableName = @"Chips";
+/** The name of the bundle. */
+static NSString *const kBundle = @"Chips.bundle";
+
+static const CGFloat MDCChipFieldDefaultFontSize = 14;
 static const CGFloat MDCChipFieldHorizontalInset = 15;
 static const CGFloat MDCChipFieldVerticalInset = 8;
-static const CGFloat MDCChipFieldIndent = 4;
 static const CGFloat MDCChipFieldHorizontalMargin = 8;
 static const CGFloat MDCChipFieldVerticalMargin = 8;
 static const UIKeyboardType MDCChipFieldDefaultKeyboardType = UIKeyboardTypeEmailAddress;
@@ -39,11 +45,11 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
 
 @protocol MDCChipFieldTextFieldDelegate <NSObject>
 
-- (void)textFieldShouldRespondToDeleteBackward:(UITextField *)textField;
+- (void)textFieldDidDelete:(UITextField *)textField;
 
 @end
 
-@interface MDCChipFieldTextField : MDCTextField
+@interface MDCChipFieldTextField : UITextField
 
 @property(nonatomic, weak) id<MDCChipFieldTextFieldDelegate> deletionDelegate;
 
@@ -51,71 +57,74 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
 
 @implementation MDCChipFieldTextField
 
+const UIEdgeInsets MDCChipFieldTextFieldRTLEdgeInsets = {16, 0, 16, 4};
+
+const UIEdgeInsets MDCChipFieldTextFieldLTREdgeInsets = {16, 4, 16, 0};
+
+- (BOOL)isRTL {
+  return self.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+}
+
+- (UIEdgeInsets)textEdgeInsets {
+  return [self isRTL] ? MDCChipFieldTextFieldRTLEdgeInsets : MDCChipFieldTextFieldLTREdgeInsets;
+}
+
 - (CGRect)textRectForBounds:(CGRect)bounds {
-  CGRect textRect = [super textRectForBounds:bounds];
-  if (self.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft) {
-    textRect = MDFRectFlippedHorizontally(textRect, CGRectGetWidth(self.bounds));
-    textRect.origin.x += 5;
-  }
-  return textRect;
+  return [super textRectForBounds:UIEdgeInsetsInsetRect(bounds, [self textEdgeInsets])];
+}
+
+- (CGRect)editingRectForBounds:(CGRect)bounds {
+  return [super textRectForBounds:UIEdgeInsetsInsetRect(bounds, [self textEdgeInsets])];
+}
+
+- (CGRect)placeholderRectForBounds:(CGRect)bounds {
+  return [super textRectForBounds:UIEdgeInsetsInsetRect(bounds, [self textEdgeInsets])];
 }
 
 #pragma mark UIKeyInput
 
 - (void)deleteBackward {
-  if (self.text.length == 0) {
-    [self.deletionDelegate textFieldShouldRespondToDeleteBackward:self];
+  if ([self.delegate respondsToSelector:@selector(textFieldDidDelete:)] && self.text.length == 0) {
+    [self.deletionDelegate textFieldDidDelete:self];
   }
   [super deleteBackward];
 }
 
-#if MDC_CHIPFIELD_PRIVATE_API_BUG_FIX && \
-    !(defined(__IPHONE_8_3) && (__IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_8_3))
-
-// WARNING: This is a private method, see the warning in MDCChipField.h.
-// This is only compiled if you explicitly defined MDC_CHIPFIELD_PRIVATE_API_BUG_FIX yourself, and
-// you are targeting an iOS version less than 8.3.
-- (BOOL)keyboardInputShouldDelete:(UITextField *)textField {
-  BOOL shouldDelete = YES;
-  if ([UITextField instancesRespondToSelector:_cmd]) {
-    // clang-format off
-    BOOL (*keyboardInputShouldDelete)(id, SEL, UITextField *) =
-        (BOOL(*)(id, SEL, UITextField *))[UITextField instanceMethodForSelector:_cmd];
-    // clang-format on
-    if (keyboardInputShouldDelete) {
-      shouldDelete = keyboardInputShouldDelete(self, _cmd, textField);
-      NSOperatingSystemVersion minimumVersion = {8, 0, 0};
-      NSOperatingSystemVersion maximumVersion = {8, 3, 0};
-      NSProcessInfo *processInfo = [NSProcessInfo processInfo];
-      BOOL isIos8 = [processInfo isOperatingSystemAtLeastVersion:minimumVersion];
-      BOOL isLessThanIos8_3 = ![processInfo isOperatingSystemAtLeastVersion:maximumVersion];
-      if (![textField.text length] && isIos8 && isLessThanIos8_3) {
-        [self deleteBackward];
-      }
-    }
-  }
-  return shouldDelete;
-}
-
-#endif
-
-#pragma mark - UIAccessibility
-
 - (CGRect)accessibilityFrame {
   CGRect frame = [super accessibilityFrame];
-  return CGRectMake(frame.origin.x + self.textInsets.left, frame.origin.y,
-                    frame.size.width - self.textInsets.left, frame.size.height);
+  UIEdgeInsets textEdgeInsets = [self textEdgeInsets];
+  return CGRectMake(frame.origin.x + textEdgeInsets.left, frame.origin.y,
+                    frame.size.width - textEdgeInsets.left, frame.size.height);
+}
+
+- (void)setText:(NSString *)text {
+  [super setText:text];
+
+  if (!self.isFirstResponder) {
+    [[NSNotificationCenter defaultCenter] postNotificationName:MDCChipFieldDidSetTextNotification
+                                                        object:self];
+  }
+}
+
+- (void)setAttributedText:(NSAttributedString *)attributedText {
+  [super setAttributedText:attributedText];
+
+  if (!self.isFirstResponder) {
+    [[NSNotificationCenter defaultCenter] postNotificationName:MDCChipFieldDidSetTextNotification
+                                                        object:self];
+  }
 }
 
 @end
 
-@interface MDCChipField () <MDCChipFieldTextFieldDelegate,
-                            MDCTextInputPositioningDelegate,
-                            UITextFieldDelegate>
+@interface MDCChipField () <MDCChipFieldTextFieldDelegate, UITextFieldDelegate>
+@property(nullable, nonatomic, copy) NSString *accessibilityActionDeleteChipName;
 @end
 
 @implementation MDCChipField {
   NSMutableArray<MDCChipView *> *_chips;
+  NSAttributedString *_attributedPlaceholder;
+  NSAttributedString *_emptyAttributedString;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -125,12 +134,17 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
 
     _chips = [NSMutableArray array];
 
+    _emptyAttributedString = [[NSAttributedString alloc] initWithString:@""
+                                                             attributes:_placeholderAttributes];
+
     MDCChipFieldTextField *chipFieldTextField =
         [[MDCChipFieldTextField alloc] initWithFrame:self.bounds];
-    chipFieldTextField.underline.hidden = YES;
+    chipFieldTextField.adjustsFontForContentSizeCategory = YES;
+    UIFont *defaultFont = [UIFont systemFontOfSize:MDCChipFieldDefaultFontSize];
+    UIFont *scaledDefaultFont = [UIFontMetrics.defaultMetrics scaledFontForFont:defaultFont];
+    chipFieldTextField.font = scaledDefaultFont;
     chipFieldTextField.delegate = self;
     chipFieldTextField.deletionDelegate = self;
-    chipFieldTextField.positioningDelegate = self;
     chipFieldTextField.accessibilityTraits = UIAccessibilityTraitNone;
     chipFieldTextField.autocorrectionType = UITextAutocorrectionTypeNo;
     chipFieldTextField.autocapitalizationType = UITextAutocapitalizationTypeNone;
@@ -143,9 +157,10 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
     // Also listen for notifications posted when the text field is not the first responder.
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(textFieldDidChange)
-                                                 name:MDCTextFieldTextDidSetTextNotification
+                                                 name:MDCChipFieldDidSetTextNotification
                                                object:chipFieldTextField];
     [self addSubview:chipFieldTextField];
+    [self updateTextFieldPlaceholderText];
     _textField = chipFieldTextField;
   }
   return self;
@@ -155,6 +170,7 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
   self = [super initWithCoder:aDecoder];
   if (self) {
     [self commonMDCChipFieldInit];
+    [self updateTextFieldPlaceholderText];
   }
   return self;
 }
@@ -166,6 +182,8 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
   _contentEdgeInsets = MDCChipFieldDefaultContentEdgeInsets;
   _showPlaceholderWithChips = YES;
   _chipHeight = 32;
+
+  [self configureLocalizedAccessibilityActionName];
 }
 
 - (void)layoutSubviews {
@@ -198,7 +216,6 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
   BOOL heightChanged = CGRectGetMinY(textFieldFrame) != CGRectGetMinY(self.textField.frame);
   self.textField.frame = textFieldFrame;
 
-  [self updateTextFieldPlaceholderText];
   [self invalidateIntrinsicContentSize];
 
   if (heightChanged && [self.delegate respondsToSelector:@selector(chipFieldHeightDidChange:)]) {
@@ -207,13 +224,15 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
 }
 
 - (void)updateTextFieldPlaceholderText {
-  // Place holder label should be hidden if showPlaceholderWithChips is NO and there are chips.
-  // MDCTextField sets the placeholderLabel opacity to 0 if the text field has no text.
-  self.textField.placeholderLabel.hidden = (!self.showPlaceholderWithChips && self.chips.count > 0);
-}
-
-+ (UIFont *)textFieldFont {
-  return [UIFont systemFontOfSize:[UIFont systemFontSize]];
+  // There should be no placeholder if showPlaceholderWithChips is NO and there are chips.
+  if (!self.showPlaceholderWithChips && self.chips.count > 0) {
+    self.textField.attributedPlaceholder = _emptyAttributedString;
+  } else if (_attributedPlaceholder) {
+    self.textField.attributedPlaceholder = _attributedPlaceholder;
+  } else {
+    self.textField.placeholder = _placeholder;
+  }
+  [self setNeedsLayout];
 }
 
 - (CGSize)intrinsicContentSize {
@@ -221,6 +240,53 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
       MAX(self.minTextFieldWidth + self.contentEdgeInsets.left + self.contentEdgeInsets.right,
           CGRectGetWidth(self.bounds));
   return [self sizeThatFits:CGSizeMake(minWidth, CGFLOAT_MAX)];
+}
+
+- (void)setPlaceholder:(NSString *)string {
+  if (string == nil || string.length == 0) {
+    _placeholder = nil;
+    _attributedPlaceholder = nil;
+  } else {
+    _placeholder = [string copy];
+    // If `placeholderAttributes` is nil, create and set one with a default color.
+    if (!_placeholderAttributes) {
+      _placeholderAttributes = @{NSForegroundColorAttributeName : UIColor.placeholderTextColor};
+    }
+
+    NSAttributedString *attributedPlaceholder =
+        [[NSAttributedString alloc] initWithString:string attributes:_placeholderAttributes];
+    _attributedPlaceholder = attributedPlaceholder;
+  }
+
+  [self updateTextFieldPlaceholderText];
+}
+
+- (void)setPlaceholderAttributes:(NSDictionary<NSAttributedStringKey, id> *)placeholderAttributes {
+  // If `placeholderAttributes` parameter is not nil, make a mutable copy of it.
+  if (placeholderAttributes) {
+    NSMutableDictionary<NSAttributedStringKey, id> *mutableAttributes =
+        [placeholderAttributes mutableCopy];
+    // If no font name is passed in, use the current text field's font name.
+    // Other key:value pairs are overwritten by the new placeholder attributes.
+    if (!mutableAttributes[NSFontAttributeName]) {
+      mutableAttributes[NSFontAttributeName] = _textField.font;
+    }
+    _placeholderAttributes = mutableAttributes;
+  } else {
+    _placeholderAttributes = @{NSForegroundColorAttributeName : UIColor.placeholderTextColor};
+  }
+
+  if (_placeholder) {
+    NSAttributedString *attributedPlaceholder =
+        [[NSAttributedString alloc] initWithString:_placeholder attributes:_placeholderAttributes];
+
+    _attributedPlaceholder = attributedPlaceholder;
+  }
+
+  _emptyAttributedString = [[NSAttributedString alloc] initWithString:@""
+                                                           attributes:_placeholderAttributes];
+
+  [self updateTextFieldPlaceholderText];
 }
 
 - (CGSize)sizeThatFits:(CGSize)size {
@@ -279,13 +345,38 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
   // themselves rather than using |chipField:shouldAddChip| to prevent chips from being added.
   if (self.showChipsDeleteButton) {
     [self addClearButtonToChip:chip];
+
+    // Set Chip's accessibilityTraits to `UIAccessibilityTraitNone` if there is a `clearButton`.
+    // A11y compliance is handled by a UIAccessibilityCustomAction.
+    chip.accessibilityTraits = UIAccessibilityTraitNone;
+
+    __weak __typeof__(self) weakSelf = self;
+    __weak MDCChipView *weakChip = chip;
+
+    UIAccessibilityCustomActionHandler actionHandler =
+        ^BOOL(UIAccessibilityCustomAction *__unused customAction) {
+          __typeof__(self) strongSelf = weakSelf;
+          MDCChipView *strongChip = weakChip;
+          if (strongSelf) {
+            [strongSelf removeChip:strongChip];
+          }
+          return YES;
+        };
+
+    UIAccessibilityCustomAction *action =
+        [[UIAccessibilityCustomAction alloc] initWithName:_accessibilityActionDeleteChipName
+                                            actionHandler:actionHandler];
+
+    chip.accessibilityCustomActions = @[ action ];
   }
+
   [_chips addObject:chip];
   [self addChipSubview:chip];
   if ([self.delegate respondsToSelector:@selector(chipField:didAddChip:)]) {
     [self.delegate chipField:self didAddChip:chip];
   }
 
+  [self updateTextFieldPlaceholderText];
   [self.textField setNeedsLayout];
   [self setNeedsLayout];
 }
@@ -296,6 +387,7 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
   if ([self.delegate respondsToSelector:@selector(chipField:didRemoveChip:)]) {
     [self.delegate chipField:self didRemoveChip:chip];
   }
+  [self updateTextFieldPlaceholderText];
   [self.textField setNeedsLayout];
   [self setNeedsLayout];
 }
@@ -310,6 +402,16 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
   for (MDCChipView *chip in chipsToRemove) {
     [self removeChip:chip];
   }
+}
+
+#pragma mark - Chip selection
+
+- (void)didTapChipWithGestureRecognizer:(UITapGestureRecognizer *)gesture {
+  if (![gesture.view isKindOfClass:[MDCChipView class]]) {
+    return;
+  }
+  MDCChipView *chipView = (MDCChipView *)gesture.view;
+  chipView.selected = !chipView.selected;
 }
 
 - (void)selectChip:(MDCChipView *)chip {
@@ -362,6 +464,12 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
       stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
   if (strippedTitle.length > 0) {
     MDCChipView *chip = [[MDCChipView alloc] init];
+
+    UITapGestureRecognizer *tapGesture =
+        [[UITapGestureRecognizer alloc] initWithTarget:self
+                                                action:@selector(didTapChipWithGestureRecognizer:)];
+    [chip addGestureRecognizer:tapGesture];
+
     chip.titleLabel.text = strippedTitle;
     BOOL shouldAddChip = YES;
     if ([self.delegate respondsToSelector:@selector(chipField:shouldAddChip:)]) {
@@ -416,12 +524,17 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
 
 #pragma mark - MDCChipFieldTextFieldDelegate
 
-- (void)textFieldShouldRespondToDeleteBackward:(UITextField *)textField {
-  if ([self isAnyChipSelected]) {
-    [self removeSelectedChips];
-    [self deselectAllChips];
-  } else {
-    [self selectLastChip];
+- (void)textFieldDidDelete:(UITextField *)textField {
+  // If backspacing on an empty text field without a chip selected, select the last chip.
+  // If backspacing on an empty text field with a selected chip, delete the selected chip.
+  if (textField.text.length == 0) {
+    if ([self isAnyChipSelected]) {
+      [self removeSelectedChips];
+      [self deselectAllChips];
+      [self updateTextFieldPlaceholderText];
+    } else {
+      [self selectLastChip];
+    }
   }
 }
 
@@ -487,7 +600,8 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
   if (!CGRectIsEmpty(lastChipFrame)) {
     BOOL isTextTooWide = [self textInputDesiredWidth] >= [self availableWidthForTextInput];
     BOOL isTextFieldOnSameLineAsChips =
-        CGRectGetMidY(self.textField.frame) == CGRectGetMidY(lastChipFrame);
+        CGRectGetMidY(self.textField.frame) >= CGRectGetMinY(lastChipFrame) &&
+        CGRectGetMidY(self.textField.frame) < CGRectGetMaxY(lastChipFrame);
     if (isTextTooWide && isTextFieldOnSameLineAsChips) {
       // The text is on the same line as the chips and doesn't fit
       // Trigger layout to move the text field down to the next line
@@ -501,6 +615,10 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
 
   if ([self.delegate respondsToSelector:@selector(chipField:didChangeInput:)]) {
     [self.delegate chipField:self didChangeInput:[self.textField.text copy]];
+  }
+
+  if (_textField.text.length == 0) {
+    [self updateTextFieldPlaceholderText];
   }
 }
 
@@ -627,7 +745,7 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
     return placeholderDesiredWidth;
   }
 
-  UIFont *font = self.textField.placeholderLabel.font;
+  UIFont *font = self.textField.font;
   CGRect desiredRect = [self.textField.text
       boundingRectWithSize:CGSizeMake(UIViewNoIntrinsicMetric, UIViewNoIntrinsicMetric)
                    options:NSStringDrawingUsesLineFragmentOrigin
@@ -650,7 +768,12 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
     return self.minTextFieldWidth;
   }
 
-  UIFont *placeholderFont = self.textField.placeholderLabel.font;
+  UIFont *placeholderFont = _placeholderAttributes[NSFontAttributeName];
+
+  if (!placeholderFont) {
+    placeholderFont = self.textField.font;
+  }
+
   CGRect placeholderDesiredRect =
       [placeholder boundingRectWithSize:CGRectStandardize(self.bounds).size
                                 options:NSStringDrawingUsesLineFragmentOrigin
@@ -661,14 +784,6 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
   CGFloat placeholderDesiredWidth =
       CGRectGetWidth(placeholderDesiredRect) + self.contentEdgeInsets.right;
   return MAX(placeholderDesiredWidth, self.minTextFieldWidth);
-}
-
-#pragma mark - MDCTextInputPositioningDelegate
-
-- (UIEdgeInsets)textInsets:(UIEdgeInsets)defaultInsets
-    withSizeThatFitsWidthHint:(CGFloat)widthHint {
-  defaultInsets.left = MDCChipFieldIndent;
-  return defaultInsets;
 }
 
 #pragma mark - UIAccessibilityContainer
@@ -705,4 +820,36 @@ const UIEdgeInsets MDCChipFieldDefaultContentEdgeInsets = {
   UIAccessibilityPostNotification(UIAccessibilityLayoutChangedNotification, self.textField);
 }
 
+- (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection {
+  [super traitCollectionDidChange:previousTraitCollection];
+  [self.textField setNeedsLayout];
+  [self setNeedsLayout];
+}
+
+// Sets the localized accessibility action name for deleting a Chip.
+- (void)configureLocalizedAccessibilityActionName {
+  NSBundle *resourceBundle = [[self class] bundle];
+  _accessibilityActionDeleteChipName =
+      [resourceBundle localizedStringForKey:kAccessibilityActionDeleteNameKey
+                                      value:@"Delete"
+                                      table:kLocalizationAccessibilityTableName];
+}
+
+#pragma mark - Resource Bundle
+
++ (NSBundle *)bundle {
+  static NSBundle *bundle = nil;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    bundle = [NSBundle bundleWithPath:[self bundlePathWithName:kBundle]];
+  });
+
+  return bundle;
+}
+
++ (NSString *)bundlePathWithName:(NSString *)bundleName {
+  NSBundle *bundle = [NSBundle bundleForClass:[MDCChipField class]];
+  NSString *resourcePath = [(nil == bundle ? [NSBundle mainBundle] : bundle) resourcePath];
+  return [resourcePath stringByAppendingPathComponent:bundleName];
+}
 @end

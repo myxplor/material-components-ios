@@ -9403,13 +9403,13 @@ for the MDCTextField's accessibility label. The label now also has a inserted `,
 For example an EarlGrey matcher needs to be adjusted from
 ```swift
 EarlGrey
-      .selectElement(with: grey_accessibilityValue("Phone Number XXX-XXXX")
+      .selectElement(with: GREYAccessibilityValue("Phone Number XXX-XXXX")
 ```
 
 To:
 ```swift
 EarlGrey
-      .selectElement(with: grey_accessibilityLabel("Phone Number, XXX-XXXX")
+      .selectElement(with: GREYAccessibilityLabel("Phone Number, XXX-XXXX")
 ```
 More information can be found [in the PR](https://github.com/material-components/material-components-ios/pull/7256)
 
@@ -13181,7 +13181,7 @@ present(bottomDrawerViewController, animated: true, completion: nil)
  @end
 
 CAMediaTimingFunction *timingFunction =
-    [CAMediaTimingFunction mdc_functionWithType:MDCAnimationTimingFunctionEaseInOut];
+    [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
 [self.customView.shadowLayer animateCornerRadius:(CGFloat)25.0
                               withTimingFunction:timingFunction
                                         duration:(CGFloat)2.5];

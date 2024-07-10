@@ -27,6 +27,8 @@
 #import "MDCSnackbarOverlayView.h"
 #pragma clang diagnostic pop
 
+NS_ASSUME_NONNULL_BEGIN
+
 static const int64_t kDispatchTimeWait = (int64_t)((CGFloat)0.2 * NSEC_PER_SEC);
 
 @interface MDCSnackbarManagerInternal (Testing)
@@ -58,9 +60,9 @@ static const int64_t kDispatchTimeWait = (int64_t)((CGFloat)0.2 * NSEC_PER_SEC);
 @end
 
 @interface MDCSnackbarMessageViewTests : XCTestCase
-@property(nonatomic, strong) MDCSnackbarManager *manager;
-@property(nonatomic, strong) FakeMDCSnackbarManagerDelegate *delegate;
-@property(nonatomic, strong) MDCSnackbarMessage *message;
+@property(nonatomic, strong, nullable) MDCSnackbarManager *manager;
+@property(nonatomic, strong, nullable) FakeMDCSnackbarManagerDelegate *delegate;
+@property(nonatomic, strong, nullable) MDCSnackbarMessage *message;
 @end
 
 @implementation MDCSnackbarMessageViewTests
@@ -102,6 +104,23 @@ static const int64_t kDispatchTimeWait = (int64_t)((CGFloat)0.2 * NSEC_PER_SEC);
   XCTAssertTrue([self.message.description containsString:action.title]);
   XCTAssertTrue([self.message.description containsString:@"viewClass:"]);
   XCTAssertTrue([self.message.description containsString:@"MDCSnackbarMessageView"]);
+}
+
+- (void)testSettingMessageActionWithNilTitleAsserts {
+  // Given
+  MDCSnackbarMessageAction *action = [[MDCSnackbarMessageAction alloc] init];
+
+  // When/Then
+  XCTAssertThrows(self.message.action = action);
+}
+
+- (void)testSettingMessageActionWithEmptyTitleAsserts {
+  // Given
+  MDCSnackbarMessageAction *action = [[MDCSnackbarMessageAction alloc] init];
+  action.title = @"";
+
+  // When/Then
+  XCTAssertThrows(self.message.action = action);
 }
 
 - (void)testDescription {
@@ -239,9 +258,8 @@ static const int64_t kDispatchTimeWait = (int64_t)((CGFloat)0.2 * NSEC_PER_SEC);
   XCTAssertFalse(self.manager.internalManager.overlayView.accessibilityViewIsModal);
 }
 
-- (void)testWhenSnackbarAccessibiltyViewIsModalIsYesWithActions {
+- (void)testSnackbarAccessibilityViewIsModalIsYesWithActions {
   // Given
-  self.manager.internalManager.isVoiceOverRunningOverride = YES;
   MDCSnackbarMessageAction *action = [[MDCSnackbarMessageAction alloc] init];
   action.title = @"Tap Me";
   self.message.action = action;
@@ -259,11 +277,9 @@ static const int64_t kDispatchTimeWait = (int64_t)((CGFloat)0.2 * NSEC_PER_SEC);
   XCTAssertTrue(self.manager.internalManager.overlayView.accessibilityViewIsModal);
 }
 
-- (void)testWhenSnackbarAccessibiltyViewIsModalIsYesWithActionsAndWithoutVoiceOver {
+- (void)testSnackbarAccessibiltyViewIsModalIsNoWithoutActions {
   // Given
-  MDCSnackbarMessageAction *action = [[MDCSnackbarMessageAction alloc] init];
-  action.title = @"Tap Me";
-  self.message.action = action;
+  self.manager.internalManager.isVoiceOverRunningOverride = YES;
   self.manager.shouldEnableAccessibilityViewIsModal = YES;
 
   // When
@@ -278,9 +294,13 @@ static const int64_t kDispatchTimeWait = (int64_t)((CGFloat)0.2 * NSEC_PER_SEC);
   XCTAssertFalse(self.manager.internalManager.overlayView.accessibilityViewIsModal);
 }
 
-- (void)testWhenSnackbarAccessibiltyViewIsModalIsYesWhenWithNoActions {
+- (void)testSnackbarAccessibilityViewIsModalIsNoWithoutVoiceOverWithLegacyBehavior {
   // Given
-  self.manager.internalManager.isVoiceOverRunningOverride = YES;
+  MDCSnackbarMessageAction *action = [[MDCSnackbarMessageAction alloc] init];
+  action.title = @"Tap Me";
+  self.message.action = action;
+  self.message.usesLegacyDismissalBehavior = YES;
+  self.manager.internalManager.isVoiceOverRunningOverride = NO;
   self.manager.shouldEnableAccessibilityViewIsModal = YES;
 
   // When
@@ -376,7 +396,6 @@ static const int64_t kDispatchTimeWait = (int64_t)((CGFloat)0.2 * NSEC_PER_SEC);
 
 - (void)testManagerForwardsButtonProperties {
   // Given
-  self.manager.disabledButtonAlpha = (CGFloat)0.5;
   self.manager.uppercaseButtonTitle = NO;
   self.manager.buttonInkColor = UIColor.redColor;
   MDCSnackbarMessageAction *action = [[MDCSnackbarMessageAction alloc] init];
@@ -396,7 +415,6 @@ static const int64_t kDispatchTimeWait = (int64_t)((CGFloat)0.2 * NSEC_PER_SEC);
   XCTAssertTrue([actionButton isKindOfClass:[MDCButton class]]);
   MDCButton *button = (MDCButton *)actionButton;
   XCTAssertFalse(button.uppercaseTitle);
-  XCTAssertEqual(button.disabledAlpha, 0.5);
   XCTAssertEqualObjects(UIColor.redColor, button.inkColor);
 }
 
@@ -710,3 +728,5 @@ static const int64_t kDispatchTimeWait = (int64_t)((CGFloat)0.2 * NSEC_PER_SEC);
 }
 
 @end
+
+NS_ASSUME_NONNULL_END

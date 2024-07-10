@@ -12,20 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#import <QuartzCore/QuartzCore.h>
 #import <UIKit/UIKit.h>
 
-#import "MaterialActionSheet.h"  // ComponentImport
-#import "MaterialActionSheet+Theming.h"  // SubtargetImport
-#import "MaterialAnimationTiming.h"  // ComponentImport
-#import "MaterialButtons.h"
-#import "MaterialButtons+Theming.h"  // ComponentImport
-#import "MaterialTabs+TabBarView.h"
+#import "MDCActionSheetAction.h"
+#import "MDCActionSheetController.h"
+#import "MDCActionSheetController+MaterialTheming.h"
+#import "MDCButton.h"
+#import "MDCButton+MaterialTheming.h"
+#import "MDCTabBarItem.h"
+#import "MDCTabBarView.h"
+#import "MDCTabBarViewCustomViewable.h"
+#import "MDCTabBarViewDelegate.h"
 #import "MaterialIcons+ic_check.h"  // PrivateSubtargetImport
 #import "MaterialIcons+ic_settings.h"  // PrivateSubtargetImport
-#import "MaterialMath.h"  // PrivateImport
-#import "MaterialColorScheme.h"
-#import "MaterialContainerScheme.h"  // SchemeImport
-#import "MaterialTypographyScheme+Scheming.h"
+#import "MDCMath.h"
+#import "MDCSemanticColorScheme.h"
+#import "MDCContainerScheme.h"
+#import "MDCTypographyScheming.h"
 
 static NSString *const kExampleTitle = @"TabBarView";
 
@@ -53,7 +57,7 @@ static NSString *const kPreferredLayoutMenuAccessibilityLabel = @"Change preferr
   if (self) {
     _aSwitch = [[UISwitch alloc] init];
     _animationTimingFunction =
-        [CAMediaTimingFunction mdc_functionWithType:MDCAnimationTimingFunctionEaseInOut];
+        [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
   }
   return self;
 }
@@ -80,15 +84,17 @@ static NSString *const kPreferredLayoutMenuAccessibilityLabel = @"Change preferr
 - (void)switchTapped:(id)sender {
   [self invalidateIntrinsicContentSize];
   [self setNeedsLayout];
-  [UIView mdc_animateWithTimingFunction:self.animationTimingFunction
-                               duration:self.animationDuration
-                                  delay:0
-                                options:0
-                             animations:^{
-                               [self.superview setNeedsLayout];
-                               [self.superview layoutIfNeeded];
-                             }
-                             completion:nil];
+  [CATransaction begin];
+  [CATransaction setAnimationTimingFunction:self.animationTimingFunction];
+  [UIView animateWithDuration:self.animationDuration
+                        delay:0
+                      options:0
+                   animations:^{
+                     [self.superview setNeedsLayout];
+                     [self.superview layoutIfNeeded];
+                   }
+                   completion:nil];
+  [CATransaction commit];
 }
 
 - (CGSize)intrinsicContentSize {

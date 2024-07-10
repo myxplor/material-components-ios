@@ -14,8 +14,8 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <Foundation/Foundation.h>
 
-#import "MDCBottomNavigationBar.h"
 #import "MDCAvailability.h"
+#import "MDCBottomNavigationBar.h"
 #import "UIView+MaterialElevationResponding.h"
 
 #import "private/MDCBottomNavigationBar+Private.h"
@@ -383,6 +383,11 @@ static BOOL gEnablePerformantShadow = NO;
   return height;
 }
 
+- (void)recalculateBarHeightAndUpdateLayout {
+  _itemsLayoutViewHeightConstraint.constant = [self calculateBarHeight];
+  [self invalidateIntrinsicContentSize];
+}
+
 - (void)setEnableVerticalLayout:(BOOL)enableVerticalLayout {
   if (_enableVerticalLayout == enableVerticalLayout) {
     return;
@@ -609,7 +614,8 @@ static BOOL gEnablePerformantShadow = NO;
 - (MDCBottomNavigationItemView *_Nullable)itemViewForPoint:(CGPoint)point {
   for (NSUInteger i = 0; i < self.itemViews.count; i++) {
     MDCBottomNavigationItemView *itemView = self.itemViews[i];
-    if (CGRectContainsPoint(itemView.frame, point)) {
+    CGRect rect = [itemView convertRect:itemView.bounds toView:self];
+    if (CGRectContainsPoint(rect, point)) {
       return itemView;
     }
   }
@@ -622,6 +628,11 @@ static BOOL gEnablePerformantShadow = NO;
 
   if (self.traitCollectionDidChangeBlock) {
     self.traitCollectionDidChangeBlock(self, previousTraitCollection);
+  }
+
+  if (self.traitCollection.verticalSizeClass != previousTraitCollection.verticalSizeClass ||
+      self.traitCollection.horizontalSizeClass != previousTraitCollection.horizontalSizeClass) {
+    [self recalculateBarHeightAndUpdateLayout];
   }
 }
 
@@ -872,9 +883,7 @@ static BOOL gEnablePerformantShadow = NO;
   for (MDCBottomNavigationItemView *itemView in self.itemViews) {
     [self configureTitleStateForItemView:itemView];
   }
-  [self invalidateIntrinsicContentSize];
-  [self setNeedsLayout];
-  _itemsLayoutViewHeightConstraint.constant = [self calculateBarHeight];
+  [self recalculateBarHeightAndUpdateLayout];
 }
 
 - (void)setShowsSelectionIndicator:(BOOL)showsSelectionIndicator {
@@ -957,7 +966,7 @@ static BOOL gEnablePerformantShadow = NO;
   MDCBottomNavigationItemView *lastItemView =
       (MDCBottomNavigationItemView *)self.lastLargeContentViewerItem;
 
-  if (!CGRectContainsPoint(self.bounds, point)) {
+  if (!CGRectContainsPoint(self.itemsLayoutView.frame, point)) {
     // The touch has wandered outside of the view. Clear the ripple and do not display the
     // content viewer.
     if (lastItemView) {
@@ -1015,7 +1024,7 @@ static BOOL gEnablePerformantShadow = NO;
   UIPointerEffect *highlightEffect = [UIPointerHighlightEffect effectWithPreview:targetedPreview];
   CGRect hoverRect =
       [bottomNavigationView convertRect:[bottomNavigationView pointerEffectHighlightRect]
-                                 toView:self];
+                                 toView:self.itemsLayoutView];
   UIPointerShape *shape = [UIPointerShape shapeWithRoundedRect:hoverRect];
   return [UIPointerStyle styleWithEffect:highlightEffect shape:shape];
 }
